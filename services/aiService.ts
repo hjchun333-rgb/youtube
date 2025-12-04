@@ -107,24 +107,42 @@ const callCustomAPI = async (prompt: string, config: AIConfig, jsonMode = false)
     throw new Error('Custom API URL이 설정되지 않았습니다.');
   }
 
-  const response = await fetch(config.apiUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${config.apiKey}`
-    },
-    body: JSON.stringify({
-      prompt,
-      json_mode: jsonMode
-    })
-  });
+  try {
+    const response = await fetch(config.apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(config.apiKey && { 'Authorization': `Bearer ${config.apiKey}` })
+      },
+      body: JSON.stringify({
+        prompt,
+        json_mode: jsonMode,
+        messages: [{ role: 'user', content: prompt }],
+        model: config.model || 'default'
+      })
+    });
 
-  if (!response.ok) {
-    throw new Error('Custom API 호출 실패');
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Custom API 호출 실패 (${response.status}): ${errorText}`);
+    }
+
+    const data = await response.json();
+    
+    // 다양한 응답 형식 지원
+    return data.response || 
+           data.content || 
+           data.text || 
+           data.message?.content ||
+           data.choices?.[0]?.message?.content ||
+           data.choices?.[0]?.text ||
+           JSON.stringify(data);
+  } catch (error: any) {
+    if (error.message.includes('Failed to fetch')) {
+      throw new Error('네트워크 오류: API 서버에 연결할 수 없습니다. CORS 설정을 확인하거나 프록시를 사용하세요.');
+    }
+    throw error;
   }
-
-  const data = await response.json();
-  return data.response || data.content || data.text;
 };
 
 const callAI = async (prompt: string, jsonMode = false): Promise<string> => {
