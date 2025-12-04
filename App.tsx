@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AppStep, ScriptAnalysis } from './types';
-import { analyzeTranscript, generateNewScript } from './services/geminiService';
+import { analyzeTranscript, generateNewScript, AIProvider } from './services/aiService';
 import StepIndicator from './components/StepIndicator';
 import AnalysisView from './components/AnalysisView';
 import ScriptResult from './components/ScriptResult';
@@ -15,17 +15,28 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showApiSettings, setShowApiSettings] = useState(false);
+  const [apiProvider, setApiProvider] = useState<AIProvider>('openai');
   const [apiKey, setApiKey] = useState('');
+  const [apiUrl, setApiUrl] = useState('');
+  const [model, setModel] = useState('');
 
   useEffect(() => {
-    const savedApiKey = localStorage.getItem('gemini_api_key');
-    if (savedApiKey) {
-      setApiKey(savedApiKey);
-    }
+    const savedProvider = (localStorage.getItem('ai_provider') || 'openai') as AIProvider;
+    const savedApiKey = localStorage.getItem('ai_api_key') || '';
+    const savedApiUrl = localStorage.getItem('ai_api_url') || '';
+    const savedModel = localStorage.getItem('ai_model') || '';
+    
+    setApiProvider(savedProvider);
+    setApiKey(savedApiKey);
+    setApiUrl(savedApiUrl);
+    setModel(savedModel);
   }, []);
 
   const handleSaveApiKey = () => {
-    localStorage.setItem('gemini_api_key', apiKey);
+    localStorage.setItem('ai_provider', apiProvider);
+    localStorage.setItem('ai_api_key', apiKey);
+    localStorage.setItem('ai_api_url', apiUrl);
+    localStorage.setItem('ai_model', model);
     setShowApiSettings(false);
   };
 
@@ -104,24 +115,94 @@ function App() {
           <div className="mb-8 glass-panel p-6 rounded-xl shadow-xl animate-fade-in">
             <div className="flex items-center gap-2 mb-4">
               <Key size={20} className="text-indigo-400" />
-              <h3 className="text-lg font-semibold text-white">API 설정</h3>
+              <h3 className="text-lg font-semibold text-white">AI API 설정</h3>
             </div>
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-2">
-                  Gemini API Key
+                  AI 제공자
+                </label>
+                <select
+                  value={apiProvider}
+                  onChange={(e) => setApiProvider(e.target.value as AIProvider)}
+                  className="w-full bg-slate-800/50 border border-slate-700 rounded-lg p-3 text-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent focus:outline-none transition-all"
+                >
+                  <option value="openai">OpenAI (GPT-4, GPT-3.5)</option>
+                  <option value="anthropic">Anthropic (Claude)</option>
+                  <option value="gemini">Google Gemini</option>
+                  <option value="custom">Custom API</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  API Key
                 </label>
                 <input
                   type="password"
                   value={apiKey}
                   onChange={(e) => setApiKey(e.target.value)}
-                  placeholder="AIza...로 시작하는 API 키를 입력하세요"
+                  placeholder={
+                    apiProvider === 'openai' ? 'sk-...' :
+                    apiProvider === 'anthropic' ? 'sk-ant-...' :
+                    apiProvider === 'gemini' ? 'AIza...' :
+                    'API 키를 입력하세요'
+                  }
                   className="w-full bg-slate-800/50 border border-slate-700 rounded-lg p-3 text-slate-200 placeholder-slate-600 focus:ring-2 focus:ring-indigo-500 focus:border-transparent focus:outline-none transition-all"
                 />
                 <p className="mt-2 text-xs text-slate-500">
-                  API 키는 브라우저에 안전하게 저장됩니다. <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:underline">여기서 발급받기</a>
+                  {apiProvider === 'openai' && (
+                    <>API 키는 브라우저에 안전하게 저장됩니다. <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:underline">발급받기</a></>
+                  )}
+                  {apiProvider === 'anthropic' && (
+                    <>API 키는 브라우저에 안전하게 저장됩니다. <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:underline">발급받기</a></>
+                  )}
+                  {apiProvider === 'gemini' && (
+                    <>API 키는 브라우저에 안전하게 저장됩니다. <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:underline">발급받기</a></>
+                  )}
+                  {apiProvider === 'custom' && <>사용자 지정 API 엔드포인트에 사용될 API 키입니다.</>}
                 </p>
               </div>
+
+              {apiProvider === 'custom' && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                    API URL
+                  </label>
+                  <input
+                    type="text"
+                    value={apiUrl}
+                    onChange={(e) => setApiUrl(e.target.value)}
+                    placeholder="https://your-api.com/generate"
+                    className="w-full bg-slate-800/50 border border-slate-700 rounded-lg p-3 text-slate-200 placeholder-slate-600 focus:ring-2 focus:ring-indigo-500 focus:border-transparent focus:outline-none transition-all"
+                  />
+                  <p className="mt-2 text-xs text-slate-500">
+                    POST 요청을 보낼 API 엔드포인트 URL
+                  </p>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  모델 (선택사항)
+                </label>
+                <input
+                  type="text"
+                  value={model}
+                  onChange={(e) => setModel(e.target.value)}
+                  placeholder={
+                    apiProvider === 'openai' ? 'gpt-4o-mini (기본값)' :
+                    apiProvider === 'anthropic' ? 'claude-3-5-sonnet-20241022 (기본값)' :
+                    apiProvider === 'gemini' ? 'gemini-2.0-flash-exp (기본값)' :
+                    '모델명을 입력하세요'
+                  }
+                  className="w-full bg-slate-800/50 border border-slate-700 rounded-lg p-3 text-slate-200 placeholder-slate-600 focus:ring-2 focus:ring-indigo-500 focus:border-transparent focus:outline-none transition-all"
+                />
+                <p className="mt-2 text-xs text-slate-500">
+                  비워두면 기본 모델이 사용됩니다
+                </p>
+              </div>
+
               <div className="flex justify-end gap-3">
                 <button
                   onClick={() => setShowApiSettings(false)}
@@ -131,7 +212,7 @@ function App() {
                 </button>
                 <button
                   onClick={handleSaveApiKey}
-                  disabled={!apiKey.trim()}
+                  disabled={!apiKey.trim() || (apiProvider === 'custom' && !apiUrl.trim())}
                   className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   저장
