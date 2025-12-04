@@ -1,8 +1,17 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { ScriptAnalysis } from "../types";
 
-const apiKey = process.env.API_KEY || '';
-const ai = new GoogleGenAI({ apiKey });
+const getApiKey = () => {
+  return localStorage.getItem('gemini_api_key') || process.env.API_KEY || '';
+};
+
+const getAI = () => {
+  const apiKey = getApiKey();
+  if (!apiKey) {
+    throw new Error('API 키가 설정되지 않았습니다. 설정 메뉴에서 API 키를 입력해주세요.');
+  }
+  return new GoogleGenAI({ apiKey });
+};
 
 // Model constants
 const ANALYSIS_MODEL = "gemini-2.5-flash";
@@ -10,6 +19,8 @@ const WRITING_MODEL = "gemini-2.5-flash";
 
 export const analyzeTranscript = async (transcript: string): Promise<ScriptAnalysis> => {
   if (!transcript) throw new Error("Transcript is required");
+  
+  const ai = getAI();
 
   const prompt = `
     You are an expert YouTube content strategist. Analyze the following video transcript deep down to its core DNA.
@@ -64,6 +75,7 @@ export const analyzeTranscript = async (transcript: string): Promise<ScriptAnaly
 };
 
 export const generateNewScript = async (analysis: ScriptAnalysis, topic: string): Promise<string> => {
+  const ai = getAI();
   const analysisJson = JSON.stringify(analysis, null, 2);
   
   const prompt = `

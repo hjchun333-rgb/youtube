@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AppStep, ScriptAnalysis } from './types';
 import { analyzeTranscript, generateNewScript } from './services/geminiService';
 import StepIndicator from './components/StepIndicator';
 import AnalysisView from './components/AnalysisView';
 import ScriptResult from './components/ScriptResult';
-import { Sparkles, ArrowRight, Video, AlertCircle } from 'lucide-react';
+import { Sparkles, ArrowRight, Video, AlertCircle, Settings, Key } from 'lucide-react';
 
 function App() {
   const [step, setStep] = useState<AppStep>(AppStep.INPUT_TRANSCRIPT);
@@ -14,6 +14,20 @@ function App() {
   const [generatedScript, setGeneratedScript] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showApiSettings, setShowApiSettings] = useState(false);
+  const [apiKey, setApiKey] = useState('');
+
+  useEffect(() => {
+    const savedApiKey = localStorage.getItem('gemini_api_key');
+    if (savedApiKey) {
+      setApiKey(savedApiKey);
+    }
+  }, []);
+
+  const handleSaveApiKey = () => {
+    localStorage.setItem('gemini_api_key', apiKey);
+    setShowApiSettings(false);
+  };
 
   const handleAnalysis = async () => {
     if (!transcript.trim()) return;
@@ -66,17 +80,67 @@ function App() {
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950 text-slate-200 selection:bg-indigo-500 selection:text-white">
       {/* Header */}
       <header className="border-b border-white/5 bg-slate-900/50 backdrop-blur-md sticky top-0 z-50">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-            <Sparkles size={18} className="text-white" />
+        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+              <Sparkles size={18} className="text-white" />
+            </div>
+            <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">
+              ScriptAlchemist
+            </h1>
           </div>
-          <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">
-            ScriptAlchemist
-          </h1>
+          <button
+            onClick={() => setShowApiSettings(!showApiSettings)}
+            className="p-2 hover:bg-slate-800 rounded-lg transition-colors"
+            title="API 설정"
+          >
+            <Settings size={20} className="text-slate-400" />
+          </button>
         </div>
       </header>
 
       <main className="max-w-4xl mx-auto px-4 py-12">
+        {showApiSettings && (
+          <div className="mb-8 glass-panel p-6 rounded-xl shadow-xl animate-fade-in">
+            <div className="flex items-center gap-2 mb-4">
+              <Key size={20} className="text-indigo-400" />
+              <h3 className="text-lg font-semibold text-white">API 설정</h3>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Gemini API Key
+                </label>
+                <input
+                  type="password"
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  placeholder="AIza...로 시작하는 API 키를 입력하세요"
+                  className="w-full bg-slate-800/50 border border-slate-700 rounded-lg p-3 text-slate-200 placeholder-slate-600 focus:ring-2 focus:ring-indigo-500 focus:border-transparent focus:outline-none transition-all"
+                />
+                <p className="mt-2 text-xs text-slate-500">
+                  API 키는 브라우저에 안전하게 저장됩니다. <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:underline">여기서 발급받기</a>
+                </p>
+              </div>
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => setShowApiSettings(false)}
+                  className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors"
+                >
+                  취소
+                </button>
+                <button
+                  onClick={handleSaveApiKey}
+                  disabled={!apiKey.trim()}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  저장
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <StepIndicator currentStep={step} />
 
         {error && (
